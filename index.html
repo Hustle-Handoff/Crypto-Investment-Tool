@@ -462,41 +462,43 @@ function computeTax(gain){
 ['tx-state','tx-filing','tx-income'].forEach(id=>$(id).addEventListener('change',calc));
 calc();
 
-/* ---------- Live price fetch (uses Claude web search) ---------- */
+/* ---------- Live price fetch (CoinGecko public API, no key) ---------- */
 const symEl=$('sym'), fetchBtn=$('fetch'), pstatus=$('pstatus');
 
 async function fetchPrice(){
-  const sym=symEl.value.trim().toUpperCase();
-  if(!sym){ pstatus.textContent='Enter a coin symbol first.'; symEl.focus(); return; }
+  const raw=symEl.value.trim();
+  if(!raw){ pstatus.textContent='Enter a coin symbol first.'; symEl.focus(); return; }
+  const sym=raw.toUpperCase();
   fetchBtn.disabled=true; fetchBtn.textContent='…';
   pstatus.innerHTML=`Searching current price for <b>${sym}</b>…`;
 
-  const system=`You are a precise crypto-price fetcher. Use web search to find the MOST RECENT spot price in USD for the cryptocurrency with ticker/symbol "${sym}". `+
-    `Respond with ONLY a single minified JSON object, no prose or markdown: `+
-    `{"symbol":string,"name":string,"priceUsd":number,"asOf":string(brief date/source note)}. Use null for priceUsd if not found.`;
-
   try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        model:"claude-sonnet-4-20250514",max_tokens:600,system,
-        messages:[{role:"user",content:`Current USD price for crypto ${sym}.`}],
-        tools:[{type:"web_search_20250305",name:"web_search"}]
-      })
-    });
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const data=await res.json();
-    const text=(data.content||[]).map(b=>b.type==="text"?b.text:"").join("").trim();
-    const match=text.replace(/```json|```/g,"").match(/\{[\s\S]*\}/);
-    if(!match) throw new Error("no price returned");
-    const d=JSON.parse(match[0]);
-    if(d.priceUsd==null||isNaN(d.priceUsd)) throw new Error("price unavailable");
-    $('buy').value = d.priceUsd;
+    // 1) Resolve the ticker/name to a CoinGecko coin id.
+    const sRes=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(raw)}`);
+    if(!sRes.ok) throw new Error("HTTP "+sRes.status);
+    const sData=await sRes.json();
+    const coins=(sData&&sData.coins)||[];
+    if(!coins.length) throw new Error("coin not found");
+    // Prefer an exact symbol match; among ties pick the highest market cap.
+    const exact=coins.filter(c=>c.symbol&&c.symbol.toUpperCase()===sym);
+    const pool=exact.length?exact:coins;
+    pool.sort((a,b)=>(a.market_cap_rank??1e9)-(b.market_cap_rank??1e9));
+    const coin=pool[0];
+
+    // 2) Fetch the current USD spot price for that id.
+    const pRes=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coin.id)}&vs_currencies=usd`);
+    if(!pRes.ok) throw new Error("HTTP "+pRes.status);
+    const pData=await pRes.json();
+    const price=pData[coin.id]&&pData[coin.id].usd;
+    if(price==null||isNaN(price)) throw new Error("price unavailable");
+
+    $('buy').value = price;
     calc();
-    pstatus.innerHTML=`<b>${d.name||sym}</b> ≈ ${money(d.priceUsd)} loaded as buy price — ${d.asOf||'via web search'}.`;
+    const ts=new Date().toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});
+    pstatus.innerHTML=`<b>${coin.name||sym}</b> ≈ ${money(price)} loaded as buy price — via CoinGecko, ${ts}.`;
   }catch(err){
     pstatus.innerHTML=`Couldn't fetch <b>${sym}</b> (<span class="err">${err.message}</span>). `+
-      `Live lookup needs this page open inside Claude — but you can type the buy price in by hand.`;
+      `Check the symbol or try again in a moment — or type the buy price in by hand.`;
   }finally{
     fetchBtn.disabled=false; fetchBtn.textContent='Get Price';
   }
