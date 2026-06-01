@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b6a4ec"/>
+      <stop offset="1" stop-color="#6fa8d8"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#ff8a5c"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded square base -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bg)"/>
+  <!-- flame -->
+  <path d="M32 50 C27 45 27 41 32 38 C37 41 37 45 32 50 Z" fill="url(#flame)"/>
+  <!-- rocket body -->
+  <path d="M32 12
+           C39 17 42 26 42 34
+           L40 41 L24 41 L22 34
+           C22 26 25 17 32 12 Z"
+        fill="#ffffff"/>
+  <!-- window -->
+  <circle cx="32" cy="27" r="4.2" fill="#6fa8d8"/>
+  <!-- fins -->
+  <path d="M24 34 L17 41 L24 41 Z" fill="#e7defb"/>
+  <path d="M40 34 L47 41 L40 41 Z" fill="#e7defb"/>
+</svg>
